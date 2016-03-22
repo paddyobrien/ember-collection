@@ -85,6 +85,8 @@ export default Ember.Component.extend({
       this._rawItems = rawItems;
       var items = Ember.A(rawItems);
       this.set('_items', items);
+      this.set('_cells', Ember.A());
+      this.set('_cellMap', Object.create(null));
 
       if (items && items.addArrayObserver) {
         items.addArrayObserver(this, {
