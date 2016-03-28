@@ -136,23 +136,21 @@ export default Ember.Component.extend({
     if (this._cellLayout.length !== numItems) {
       this._cellLayout.length = numItems;
     }
+    let items = this._items;
+    let priorMap = this._cellMap;
+    let cellMap = Object.create(null);
 
-    var priorMap = this._cellMap;
-    var cellMap = Object.create(null);
+    let [offset, count] = this._getOffsetAndCount();
 
-    var index = this._cellLayout.indexAt(this._scrollLeft, this._scrollTop, this._clientWidth, this._clientHeight);
-    var count = this._cellLayout.count(this._scrollLeft, this._scrollTop, this._clientWidth, this._clientHeight);
-    var items = this._items;
-    var bufferBefore = Math.min(index, this._buffer);
-    index -= bufferBefore;
-    count += bufferBefore;
-    count = Math.min(count + this._buffer, get(items, 'length') - index);
-    var i, style, itemIndex, itemKey, cell;
+    let i, style, itemIndex, itemKey, cell;
 
-    var newItems = [];
-
-    for (i=0; i<count; i++) {
-      itemIndex = index+i;
+    let newItems = [];
+    // If we already have a rendered cell for this item
+    //  Update it's props and put it in the cell map
+    // If we don't have a rendered cell
+    //   push the index of the item into newItems
+    for (i = 0; i < count; i++) {
+      itemIndex = offset + i;
       itemKey = decodeEachKey(items.objectAt(itemIndex), '@identity');
       if (priorMap) {
         cell = priorMap[itemKey];
@@ -161,7 +159,6 @@ export default Ember.Component.extend({
         style = this._cellLayout.formatItemStyle(itemIndex, this._clientWidth, this._clientHeight);
         set(cell, 'style', style);
         set(cell, 'hidden', false);
-        set(cell, 'key', itemKey);
         set(cell, 'index', itemIndex);
         cellMap[itemKey] = cell;
       } else {
@@ -169,7 +166,10 @@ export default Ember.Component.extend({
       }
     }
 
-    for (i=0; i<this._cells.length; i++) {
+    // Look at all the cells we have. If they're not in the new cellMap
+    // then they're free to be re-used now. Pop items off the newItems list and
+    // reuse what cells we can. If we run out of new items hide any remaining cells
+    for (i = 0; i < this._cells.length; i++) {
       cell = this._cells[i];
       if (!cellMap[cell.key]) {
         if (newItems.length) {
@@ -189,8 +189,10 @@ export default Ember.Component.extend({
         }
       }
     }
-
-    for (i=0; i<newItems.length; i++) {
+    // If we've run out of existing cells and still have new items to render
+    // then create some new cells and put them on the cells array
+    // This path should only happen on first render or if the clientSize or bufferSize changes
+    for (i = 0; i < newItems.length; i++) {
       itemIndex = newItems[i];
       let item = items.objectAt(itemIndex);
       itemKey = decodeEachKey(item, '@identity');
@@ -201,6 +203,16 @@ export default Ember.Component.extend({
     }
     this._cellMap = cellMap;
   },
+
+  _getOffsetAndCount() {
+    let index = this._cellLayout.indexAt(this._scrollLeft, this._scrollTop, this._clientWidth, this._clientHeight);
+    let count = this._cellLayout.count(this._scrollLeft, this._scrollTop, this._clientWidth, this._clientHeight);
+    let bufferBefore = Math.min(index, this._buffer);
+    index -= bufferBefore;
+    count = Math.min(count + this._buffer, get(this._items, 'length') - index);
+    return [index, count];
+  },
+
   actions: {
     scrollChange(scrollLeft, scrollTop) {
       if (this._scrollChange) {
